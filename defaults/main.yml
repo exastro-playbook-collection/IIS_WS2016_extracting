@@ -1,0 +1,6 @@
+---
+VAR_IIS_extracting_rolename:
+  - IIS_Install
+  - IIS_Setup
+VAR_IIS_gathering_dest: "{{ playbook_dir }}/_gathered_data"
+VAR_IIS_extracting_dest: "{{ playbook_dir }}/_parameters"

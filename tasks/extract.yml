@@ -1,0 +1,79 @@
+---
+- name: check param VAR_IIS_extracting_rolename subElement
+  stat:
+    path: "{{ VAR_IIS_gathering_dest }}/{{ inventory_hostname }}/IIS_WS2016_gathering"
+  delegate_to: localhost
+  become: no
+  register: file_exist
+
+- name: parameter_generate run
+  block:
+  # 1-01  IIS Install Roleのパラメータ生成
+    - name: Execute the parameter_generate module for IIS_Install
+      parameter_generate:
+        rolename: "{{ outer_item }}"
+        collect_root: "{{ VAR_IIS_gathering_dest }}/{{ inventory_hostname }}/IIS_WS2016_gathering"
+        config: "{{ mapping_definition }}"
+        dest: "{{ VAR_IIS_extracting_dest }}"
+        specific: "python {{ role_path }}/files/iis_install.py"
+      vars:
+        mapping_definition:
+          - src: /command/0/stdout.txt
+            type: text
+            params:
+              - variable: "VAR_IIS_OS_Version"
+                value_type: "str"
+                regexp: "(.*)"
+                value: "Windows Server 2016"
+              - variable: "VAR_IIS_INSTALLTYPE"
+                value_type: "str"
+                regexp: "(.*)"
+                value: "CUSTOM"
+              - variable: "VAR_IIS_SOURCEPATH"
+                value_type: "str"
+                regexp: "(.*)"
+                value: "C:\\Windows\\Temp"
+              - variable: "VAR_Installer_Name"
+                value_type: "str"
+                regexp: "(.*)"
+                value: "microsoft-windows-netfx3-ondemand-package.cab"
+              - variable: "VAR_IIS_State"
+                value_type: "str"
+                regexp: "(.*)"
+                value: "START"
+      when: outer_item == "IIS_Install"
+
+  # 1-02　IIS設定Roleのパラメータ生成
+    - name: Execute the parameter_generate module for IIS_Setup
+      block:
+        - name: write count of website in IIS_Setup.yml
+          parameter_generate:
+            rolename: "{{ outer_item }}"
+            collect_root: "{{ VAR_IIS_gathering_dest }}/{{ inventory_hostname }}/IIS_WS2016_gathering"
+            dest: "{{ VAR_IIS_extracting_dest }}"
+            specific: "python {{ role_path }}/files/iis_setup.py"
+
+        - name: read IIS_Setup.yml
+          raw: "cat {{ VAR_IIS_extracting_dest }}/{{ inventory_hostname }}/{{ outer_item }}.yml | grep 'count'"
+          register: command_result
+          delegate_to: localhost
+
+        - name: set param count
+          set_fact:
+            count: "{{ command_result.stdout_lines[0] | replace('count:', '') | trim | int }}"
+
+        - name: Split file
+          parameter_generate:
+            rolename: "{{ outer_item }}"
+            collect_root: "{{ VAR_IIS_gathering_dest }}/{{ inventory_hostname }}/IIS_WS2016_gathering"
+            dest: "{{ VAR_IIS_extracting_dest }}/{{ inventory_hostname }}/IIS_Setup/{{ item }}"
+            specific: "python {{ role_path }}/files/iis_setup_split.py {{ item }}"
+          with_sequence: start=1 end="{{ count }}" stride=1
+
+        - name: delete IIS_Setup.yml
+          file:
+            path: "{{ VAR_IIS_extracting_dest }}/{{ inventory_hostname }}/{{ outer_item }}.yml"
+            state: absent
+          delegate_to: localhost
+      when: outer_item == "IIS_Setup"
+  when: file_exist.stat.exists != false

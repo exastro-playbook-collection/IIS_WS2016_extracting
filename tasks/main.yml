@@ -1,0 +1,37 @@
+---
+  - name: check param VAR_IIS_extracting_rolename is none
+    fail:
+      msg: "Parameter VAR_IIS_extracting_rolename cannot be NULL."
+    when: "(VAR_IIS_extracting_rolename is none) or (VAR_IIS_extracting_rolename == '')"
+
+  - name: check param VAR_IIS_gathering_dest
+    fail:
+      msg: "Parameter VAR_IIS_gathering_dest cannot be NULL."
+    when: "(VAR_IIS_gathering_dest is none) or (VAR_IIS_gathering_dest == '')"
+
+  - name: check param VAR_IIS_extracting_dest
+    fail:
+      msg: "Parameter VAR_IIS_extracting_dest cannot be NULL."
+    when: "(VAR_IIS_extracting_dest is none) or (VAR_IIS_extracting_dest == '')"
+
+  - name: Remove IIS_Install old data
+    file:
+      path: "{{ VAR_IIS_extracting_dest }}/{{ inventory_hostname }}/IIS_Install.yml"
+      state: absent
+    delegate_to: localhost
+    become: no
+    when: "'IIS_Install' in VAR_IIS_extracting_rolename"
+
+  - name: Remove IIS_Setup old data
+    file:
+      path: "{{ VAR_IIS_extracting_dest }}/{{ inventory_hostname }}/IIS_Setup"
+      state: absent
+    delegate_to: localhost
+    become: no
+    when: "'IIS_Setup' in VAR_IIS_extracting_rolename"
+
+  - name: Execute IIS's parameter_generate
+    include_tasks: extract.yml
+    with_items: "{{ VAR_IIS_extracting_rolename }}"
+    loop_control:
+      loop_var: outer_item
